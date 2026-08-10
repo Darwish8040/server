@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
+using JunimoServer.Util;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -102,10 +103,16 @@ public class SteamGameServerNetworkingService : ModService
                 );
             }
 
-            // Create and add our GameServer-based network server
+            // Create and add our GameServer-based network server.
+            // InitServer is what lets SMAPI install its message hook (SMultiplayer.InitServer sets
+            // HookableServer.OnProcessingMessage); vanilla routes every server it creates through it
+            // (GameServer ctor for Lidgren, SteamNetHelper.CreateSteamServer for Steam). Without it the
+            // hook stays at its resume-only default, so the client's ModContext handshake message is
+            // dropped and the host never replies with its own mod list — every farmhand then treats the
+            // host as vanilla and mods gated on "does the host have this installed" disable themselves.
             _monitor.Log("Adding SteamGameServerNetServer for SDR connections", LogLevel.Info);
             var gameServerNet = new SteamGameServerNetServer(Game1.server, _monitor, _helper);
-            servers.Add(gameServerNet);
+            servers.Add(_helper.GetMultiplayer().InitServer(gameServerNet));
             gameServerNet.initialize();
 
             _serverAdded = true;

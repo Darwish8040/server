@@ -321,6 +321,7 @@ public class AlwaysOnServer : ModService
         modCompat.HandleSpaceCoreLevelUpMenu();
         HandleShippingMenu();
         HandleCommunityCenterUnlock();
+        HandleCommunityCenterCompletionMail();
     }
 
     private void OnUpdateTicked(object sender, UpdateTickedEventArgs e)
@@ -571,6 +572,52 @@ public class AlwaysOnServer : ModService
         if (!Game1.MasterPlayer.mailReceived.Contains("ccDoorUnlock"))
         {
             Game1.MasterPlayer.mailReceived.Add("ccDoorUnlock");
+        }
+    }
+
+    /// <summary>
+    /// Area index to completion mail flag, mirroring <c>CommunityCenter.doAreaCompleteReward</c>
+    /// (vanilla exposes no public mapping; note area 5 is "ccBulletin", not "ccBulletinBoard").
+    /// </summary>
+    private static string? GetAreaCompletionMailFlag(int area)
+    {
+        return area switch
+        {
+            0 => "ccPantry",
+            1 => "ccCraftsRoom",
+            2 => "ccFishTank",
+            3 => "ccBoilerRoom",
+            4 => "ccVault",
+            5 => "ccBulletin",
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Vanilla's area-completion reward writes the cc* flag to whichever client's
+    /// <c>Game1.player</c> finished the last bundle, so a farmhand's completion never reaches the
+    /// host. World state gated on <c>Game1.MasterPlayer.mailReceived</c> (minecarts, bridge, bus)
+    /// would then stay locked, so re-derive the flags from the replicated <c>areasComplete</c>.
+    /// </summary>
+    private void HandleCommunityCenterCompletionMail()
+    {
+        if (Game1.getLocationFromName("CommunityCenter") is not CommunityCenter communityCenter)
+        {
+            return;
+        }
+
+        for (int area = 0; area < communityCenter.areasComplete.Count; area++)
+        {
+            if (!communityCenter.areasComplete[area])
+            {
+                continue;
+            }
+
+            var mailFlag = GetAreaCompletionMailFlag(area);
+            if (mailFlag != null && !Game1.MasterPlayer.mailReceived.Contains(mailFlag))
+            {
+                Game1.MasterPlayer.mailReceived.Add(mailFlag);
+            }
         }
     }
 
